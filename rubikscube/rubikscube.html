@@ -1,0 +1,736 @@
+<html>
+<head>
+
+   <!--defining the charset-->
+  <meta charset="utf-8" />
+  <title> Fireworks</title>
+
+
+
+   <!--including the css-->
+  <style type="text/css">
+
+  html {
+  	height: 100%;
+  }
+
+
+  /*CSS Style*/
+  a {
+  	text-decoration: none;
+    font-family: 'Arial';
+    font-style: oblique;
+    font-weight: bold;
+  }
+
+  #scene {
+    height: 100%;
+  }
+
+  #other1 > li {
+    position: absolute;
+    left:    0;
+    top:   0;
+    margin: 5px;
+    padding: 20;
+    max-width: 100%;
+  	list-style-type: none;
+    text-decoration: none;
+    font-family: 'Arial';
+    font-style: oblique;
+    font-weight: bold;
+    color: #FFB6C1;
+
+  }
+
+
+  #other2 > li {
+    position: absolute;
+    left:    0;
+    top:   40;
+    margin: 5px;
+    padding: 20;
+    max-width: 100%;
+    list-style-type: none;
+    text-decoration: none;
+    font-family: 'Arial';
+    font-style: oblique;
+    font-weight: bold;
+    color: #FFB6C1;
+
+  }
+
+  #other3 > li {
+    position: absolute;
+    left:    0;
+    top:   60;
+    margin: 5px;
+    padding: 20;
+    max-width: 100%;
+    list-style-type: none;
+    text-decoration: none;
+    font-family: 'Arial';
+    font-style: oblique;
+    font-weight: bold;
+    color: #FFB6C1;
+
+  }
+
+  #other4 > li {
+    position: absolute;
+    left:    0;
+    top:   80;
+    margin: 5px;
+    padding: 20;
+    max-width: 100%;
+    list-style-type: none;
+    text-decoration: none;
+    font-family: 'Arial';
+    font-style: oblique;
+    font-weight: bold;
+    color: #FFB6C1;
+
+  }
+
+
+  #buttons {
+    position: absolute;
+    left:    0;
+    bottom:   0;
+    margin: 5px;
+    padding: 20;
+    max-width: 100%;
+  	list-style-type: none;
+
+  }
+
+  #buttons > li {
+  	margin: 5px;
+  	padding: 0;
+  	float: center;
+  }
+
+  #buttons > li a, #buttons > li label {
+
+  	margin-right: 10px;
+    text-decoration: none;
+    font-family: 'Arial';
+    font-style: oblique;
+    font-weight: bold;
+    color: #FFB6C1;
+
+  }
+
+  #buttons > li a:hover {
+
+  	color: #F08080;
+
+  }
+
+
+  </style>
+</head>
+
+<body>
+
+  <!--importing libraries-->
+ <script src="Library/JavaScript/threeJS/three.js"></script>
+ <script src="Library/JavaScript/threeJS/OrbitControls.js"></script>
+ <script src="Library/JavaScript/jQuery/jquery-2.0.3.js"></script>
+ <script src='Library/JavaScript/threeJS/threex.domevent.js'></script>
+ <script src='Library/JavaScript/threeJS/threex.domevent.object3d.js'></script>
+<script src='Library/JavaScript/threeJS/stats.min.js'></script>
+
+
+
+   <!--define button functionality-->
+  <ul id="other1">
+  <li>Rubik's Cube Project
+  </li>
+  </ul>
+
+  <ul id="other2">
+  <li>
+      -> please turn on sound
+  </li>
+  </ul>
+
+
+  <ul id="other3">
+  <li>
+      -> rotate cube by dragging when mouse is on the cube
+  </li>
+  </ul>
+
+  <ul id="other4">
+  <li>
+      -> change camera by dragging when mouse is not on the cube
+  </li>
+  </ul>
+
+
+
+  <ul id="buttons">
+    <li><a href="#newstart" id="newstart">New Start</a></li>
+    <li>
+      <label>Size of the Cube</label>
+      <select id="size">
+        <option value="2">two</option>
+        <option selected value="3">three</option>
+        <option value="4">four</option>
+        <option value="5">five</option>
+        <option value="6">six</option>
+      </select>
+
+      <label>Spacing between Cubes</label>
+      <select id="scaling">
+        <option value="0">unibody</option>
+        <option selected value="0.1">normal</option>
+        <option value="1">big</option>
+        <option value="4">huge</option>
+      </select>
+    </li>
+        <li><a href="#shuffle" id="shuffle">Shuffle the Cube</a></li>
+  </ul>
+  <div id="scene"></div>
+
+
+  <script>
+
+  //_____________________________________________________________________//
+  // CSS buttons functionality
+
+var cubeDimensions = 3
+var spacingBetweenCubes = 0.1
+var rubik
+
+  $(function() {
+    $("#newstart").on('click', function(e) { e.preventDefault(); init(); });
+    $("#shuffle").on('click', function(e) { e.preventDefault(); rubik.shuffleCube() });
+    $("#size").on('change', function() {
+      cubeDimensions = +$(this).val()
+      init({cubeDimensions: cubeDimensions, spacingBetweenCubes: spacingBetweenCubes})
+    });
+    $("#scaling").on('change', function() {
+      spacingBetweenCubes = +$(this).val()
+      init({spacingBetweenCubes: spacingBetweenCubes, cubeDimensions: cubeDimensions})
+    });
+
+    // {color: #eaeaea}
+
+    function init(config) {
+      var scene = $("#scene").empty();
+      rubik = new Rubik(scene, config || {});
+    };
+
+  init();
+
+  });
+
+
+
+  //__________________________________________________________________//
+  //Three.JS
+
+
+  //__________________________________________________________________//
+  // element: DOM element using jQuery
+  function Rubik(element, config) {
+
+    // scene size
+    var width = element.innerWidth(),
+        height = element.innerHeight();
+
+    // general initialize
+    var scene = new THREE.Scene(),
+        camera = new THREE.PerspectiveCamera(20, width / height, 0.1, 500),
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+
+    // general camera
+    camera.position = new THREE.Vector3(0, 0, 100);
+    camera.lookAt(scene.position);
+    THREE.Object3D._threexDomEvent.camera(camera);
+
+    // number of cubes --> can be changed
+    cubeDimensions = config.cubeDimensions || 3;
+    color = config.color || 0xE6E6FA;
+
+    // general initialize
+    renderer.setClearColor(color, 1.0);
+    renderer.setSize(width, height);
+    renderer.shadowMapEnabled = true;
+
+    // adding the DOM element
+    element.append(renderer.domElement);
+
+
+
+
+    //___________________________________________________________________________//
+    // Cube Set Up
+
+    // Size, spacingBetweenCubes, Speed of Rotation of the Cube
+        var sizeOfCube = 3;
+
+    // Default Spacing of Cube
+        var spacingBetweenCubes = config.spacingBetweenCubes || 0.1;
+        if (config.spacingBetweenCubes == 0)
+          spacingBetweenCubes = 0
+
+    // speed of Rotation
+        var speedOfRotation = 0.1;
+
+        // Change Size Function
+        var add = sizeOfCube + spacingBetweenCubes,
+            maximumExtensionCube = (sizeOfCube * cubeDimensions + spacingBetweenCubes * (cubeDimensions - 1)) / 2,
+            entireCubeParts = [];
+
+        // cubeDimensions resize
+        var offPosition = (cubeDimensions - 1) / 2;
+        for(var a = 0; a < cubeDimensions; a ++) {
+          for(var b = 0; b < cubeDimensions; b ++) {
+            for(var c = 0; c < cubeDimensions; c ++) {
+
+              var x = (a - offPosition) * add,
+                  y = (b - offPosition) * add,
+                  z = (c - offPosition) * add;
+
+
+
+
+//__________________________________________________________________//
+// Cube Set Up
+
+        // Cube sidecolor
+        var sideColors = [0xFFB6C1, 0x808080, 0xFFEFD5, 0xADD8E6, 0xDCDCDC, 0xFFFFFF],
+            side = sideColors.map(function(c) {
+            return new THREE.MeshLambertMaterial({ color: c , ambient: c });
+            }),
+            cubeMapping = new THREE.MeshFaceMaterial(side);
+
+            dice = new THREE.Mesh(
+                 new THREE.CubeGeometry(562, 562, 562, 1, 1, 1, materials),
+                 new THREE.MeshFaceMaterial());
+
+            var materials = [
+                new THREE.MeshLambertMaterial({
+                    map: THREE.ImageUtils.loadTexture('images/SkyBox0.bmp')
+                }),
+                new THREE.MeshLambertMaterial({
+                    map: THREE.ImageUtils.loadTexture('images/SkyBox1.bmp')
+                }),
+                new THREE.MeshLambertMaterial({
+                    map: THREE.ImageUtils.loadTexture('images/SkyBox2.bmp')
+                }),
+                new THREE.MeshLambertMaterial({
+                    map: THREE.ImageUtils.loadTexture('images/SkyBox3.bmp')
+                }),
+                new THREE.MeshLambertMaterial({
+                    map: THREE.ImageUtils.loadTexture('images/SkyBox4.bmp')
+                }),
+                new THREE.MeshLambertMaterial({
+                    map: THREE.ImageUtils.loadTexture('images/SkyBox5.bmp')
+                })
+             ];
+
+
+
+
+
+
+
+        // Cube object
+        function newCube(x, y, z) {
+
+          var cubeGeometry = new THREE.CubeGeometry(sizeOfCube, sizeOfCube, sizeOfCube);
+          var cube = new THREE.Mesh(cubeGeometry, cubeMapping);
+
+          cube.position = new THREE.Vector3(x, y, z);
+          cube.cubeStatus = cube.position.clone();
+
+          cube.on('mouseup', function(e) {
+            mouseRelease(e, cube);
+          });
+          cube.on('mousedown', function(e) {
+            mouseClick(e, cube);
+          });
+
+
+          scene.add(cube);
+          entireCubeParts.push(cube);
+        }
+
+              newCube(x, y, z);
+            }
+          }
+        }
+
+
+
+
+
+
+
+
+
+
+    //__________________________________________________________________//
+    // camera
+
+    var orbitControl = new THREE.OrbitControls(camera, renderer.domElement);
+
+    function enableCameraControl() {
+      orbitControl.noRotate = false;
+    }
+
+    function disableCameraControl() {
+      orbitControl.noRotate = true;
+    }
+
+    // Intersection Control
+    var SCREEN_HEIGHT = window.innerHeight;
+    var SCREEN_WIDTH = window.innerWidth;
+
+    // Projector and Raycaster
+    var raycaster = new THREE.Raycaster(),
+        projector = new THREE.Projector();
+
+
+
+
+    //__________________________________________________________________//
+    // default and full lighting
+    scene.add(new THREE.AmbientLight(0xffffff));
+
+
+
+
+
+
+    //__________________________________________________________________//
+    // Mouse Handler
+
+
+    // Mouse Position
+    function currentMousePosition(mouseX, mouseY) {
+
+      // movement vector
+      var directionVector = new THREE.Vector3();
+      var x = ( mouseX / SCREEN_WIDTH ) * 2 - 1;
+      var y = -( mouseY / SCREEN_HEIGHT ) * 2 + 1;
+      directionVector.set(x, y, 1);
+      projector.unprojectVector(directionVector, camera);
+      directionVector.sub(camera.position);
+      directionVector.normalize();
+      raycaster.set(camera.position, directionVector);
+      return raycaster.intersectObjects(entireCubeParts, true).length > 0;
+
+    }
+
+
+    //draggingVector v -- most impacted axes return
+    function mostImpactedAxis(v) {
+      var axisMaximum = 'x',
+          max = Math.abs(v.x);
+
+      if(Math.abs(v.y) > max) {
+        axisMaximum = 'y';
+        max = Math.abs(v.y);
+      }
+
+      if(Math.abs(v.z) > max) {
+        axisMaximum = 'z';
+        max = Math.abs(v.z);
+      }
+      return axisMaximum;
+
+    }
+
+
+
+
+//__________________________________________________________________//
+// if mouse is on cube
+
+
+    //Releasing --> Dragging Direction
+    var mouseRelease = function(e, cube) {
+
+      if(draggingVector) {
+        var vectorToDrag = cube.cubeStatus.clone();
+        vectorToDrag.sub(draggingVector);
+
+        // ignore too small Dragging
+        if(vectorToDrag.length() > sizeOfCube) {
+
+          //rotate axes
+          var moveOtherAxis = vectorToDrag.clone();
+
+          // mostImpactedAxis is not the axis to rotate on
+          var axisMaximum = mostImpactedAxis(moveOtherAxis);
+
+          // rotate axis according to the transition matrix
+          var rotateAxis = matrixTransition[faceClicker][axisMaximum],
+
+              // drag the other way around
+              direction = vectorToDrag[axisMaximum] >= 0 ? 1 : -1;
+
+          //intuitive control --> reverse the pointer
+          if(faceClicker == 'x' && draggingVector.x > 0 ||
+             faceClicker == 'y' && draggingVector.y < 0 ||
+             faceClicker == 'z' && draggingVector.z < 0)
+            direction *= -1;
+
+          if(faceClicker == 'z' && rotateAxis == 'x' ||
+             faceClicker == 'x' && rotateAxis == 'z' ||
+             faceClicker == 'y' && rotateAxis == 'z')
+            direction *= -1;
+
+          upcomingRotationPush(cube, draggingVector.clone(), rotateAxis, direction);
+          startupcomingRotation();
+          // mouse movement for camera
+          enableCameraControl();
+
+          //do not rotate the other way (see matrix)
+          moveOtherAxis[faceClicker] = 0;
+
+        }
+      }
+    };
+
+
+    // draggingVector = dragging axis
+    // faceClicker = clicking point
+    var draggingVector, faceClicker;
+
+    var matrixTransition = {
+      'x': {'y': 'z', 'z': 'y'},
+      'y': {'x': 'z', 'z': 'x'},
+      'z': {'x': 'y', 'y': 'x'}
+    }
+
+
+
+//__________________________________________________________________//
+// if mouse is on cube
+
+    //Clicking --> Position Face
+    var mouseClick = function(e, cube) {
+
+      // mouse movement not for camera
+      disableCameraControl();
+      // not moving
+      if(true || !currentlyInRotation) {
+        draggingVector = cube.cubeStatus.clone();
+        var centroid = e.targetFace.centroid.clone();
+        centroid.applyMatrix4(cube.matrixWorld);
+
+        // Face of cube
+        if(accuracyBias(Math.abs(centroid.x), maximumExtensionCube))
+          faceClicker = 'x';
+        else if(accuracyBias(Math.abs(centroid.y), maximumExtensionCube))
+          faceClicker = 'y';
+        else if(accuracyBias(Math.abs(centroid.z), maximumExtensionCube))
+          faceClicker = 'z';
+      }
+    };
+
+
+
+
+
+
+//_______________________________________________________________________//
+// movement
+
+    var moveEvents = $({});
+
+    //moveQueue
+    var moveQueue = [],
+    //move done
+        completedMoveStack = [],
+    //current move
+        currentRotation;
+    //moving?
+    var currentlyInRotation = false,
+        rotateDirectionAxis, rotationN, rotateDirection;
+    var selectionToProcess = new THREE.Object3D(),
+        activeGroup = [];
+
+    // estimate move bias for mouse accuracy
+    function accuracyBias(a, b, d) {
+      d = d || 0.001;
+      return Math.abs(a - b) <= d;
+    }
+
+
+    // allign the move to mouse
+    function setActiveGroup(axis) {
+      if(draggingVector) {
+        activeGroup = [];
+
+        entireCubeParts.forEach(function(cube) {
+          if(accuracyBias(cube.cubeStatus[axis], draggingVector[axis])) {
+
+            //instanceate the move
+            activeGroup.push(cube);
+          }
+        });
+      }
+    }
+
+    // move instanceated by setActiveGroup
+    var upcomingRotationPush = function(cube, draggingVector, axis, direction) {
+      moveQueue.push({ cube: cube, vector: draggingVector, axis: axis, direction: direction });
+    }
+
+
+    // start next move
+    var startupcomingRotation = function() {
+    var upcomingRotation = moveQueue.pop();
+
+      if(upcomingRotation) {
+        draggingVector = upcomingRotation.vector;
+
+        var direction = upcomingRotation.direction || 1,
+            axis = upcomingRotation.axis;
+
+        if(draggingVector) {
+
+          if(!currentlyInRotation) {
+            currentlyInRotation = true;
+            rotateDirectionAxis = axis;
+            rotateDirection = direction;
+
+            setActiveGroup(axis);
+
+            selectionToProcess.rotation.set(0,0,0);
+            selectionToProcess.updateMatrixWorld();
+            scene.add(selectionToProcess);
+
+            activeGroup.forEach(function(e) {
+              THREE.SceneUtils.attach(e, scene, selectionToProcess);
+            });
+
+            currentRotation = upcomingRotation;
+          } else {
+          }
+        } else {
+        }
+      } else {
+        moveEvents.trigger('delete');
+      }
+    }
+
+    function initiateRotation() {
+      // do the rotation
+
+      // compensate one direction
+      if(selectionToProcess.rotation[rotateDirectionAxis] >= Math.PI / 2) {
+        selectionToProcess.rotation[rotateDirectionAxis] = Math.PI / 2;
+        rotationFinished();
+
+      // compensate other direction
+      } else if(selectionToProcess.rotation[rotateDirectionAxis] <= Math.PI / -2) {
+        selectionToProcess.rotation[rotateDirectionAxis] = Math.PI / -2;
+        rotationFinished()
+
+      // do the rotation
+      } else {
+        selectionToProcess.rotation[rotateDirectionAxis] += (rotateDirection * speedOfRotation);
+      }
+    }
+
+    var rotationFinished = function() {
+      currentlyInRotation = false;
+      rotateDirectionAxis, rotationN, rotateDirection = undefined;
+      draggingVector = undefined;
+
+      selectionToProcess.updateMatrixWorld();
+      scene.remove(selectionToProcess);
+      activeGroup.forEach(function(cube) {
+        cube.updateMatrixWorld();
+
+        cube.cubeStatus = cube.position.clone();
+        cube.cubeStatus.applyMatrix4(selectionToProcess.matrixWorld);
+
+        THREE.SceneUtils.detach(cube, selectionToProcess, scene);
+      });
+
+      completedMoveStack.push(currentRotation);
+
+      moveEvents.trigger('complete');
+
+      startupcomingRotation();
+    }
+
+//__________________________________________________________________//
+// Rendering
+
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1) + min);
+    }
+
+
+    function render() {
+
+      if(currentlyInRotation) {
+        initiateRotation();
+      }
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(render);
+    }
+
+
+
+    render();
+
+
+
+//__________________________________________________________________//
+// Add-On Functions
+
+
+// Shuffle
+
+    return {
+      shuffleCube: function() {
+        function axisRandomlySelected() {
+          return ['x', 'y', 'z'][randomInt(0,2)];
+        }
+
+        var numberOfRotations = randomInt(10, 40);
+        for(var i = 0; i < numberOfRotations; i ++) {
+          var cube = selectRandomFace();
+          upcomingRotationPush(cube, cube.position.clone(), axisRandomlySelected(), rotateInRandomDirection());
+        }
+
+        function rotateInRandomDirection() {
+          var x = randomInt(0,1);
+          if(x == 0) x = -1;
+          return x;
+        }
+        function selectRandomFace() {
+          var i = randomInt(0, entireCubeParts.length - 1);
+          return entireCubeParts[i];
+        }
+
+        startupcomingRotation();
+      },
+    }
+  }
+
+  </script>
+
+
+  <div style="display:none">
+  <audio controls autoplay loop="">
+    <source src="Library/Music/gamesound.mp3" type="audio/mpeg">
+  </audio>
+  </dive>
+
+
+</body>
+</html>

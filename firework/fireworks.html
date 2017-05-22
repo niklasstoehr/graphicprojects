@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+
+		<title>Firework Niklas Stoehr</title>
+
+		<style>
+
+		/*CSS Style*/
+
+		html, body { margin: 0; padding: 0; overflow: hidden; background-color:black;}
+
+		a {
+			text-decoration: none;
+			font-family: 'Helvetica';
+			font-style: oblique;
+			font-weight: bold;
+		}
+
+
+		#other > li {
+			position: absolute;
+			margin: 60px;
+			padding: 0;
+			list-style-type: none;
+			text-decoration: none;
+			font-size:8px;
+			font-family: 'Arial';
+			font-style: oblique;
+			font-weight: bold;
+			color: #DCDCDC;
+
+		}
+
+
+		</style>
+
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	</head>
+	<body>
+
+		<ul id="other">
+		<li>Terrain Engine - Press "A", "S", "D" and "F" to fire rockets of different kind into the night sky - please turn on sound</li>
+		</ul>
+
+		<div id="container"></div>
+
+		<script src="Library/JavaScript/ThreeJS/three.js"></script>
+		<script src="Library/JavaScript/Controls/OrbitControls.js"></script>
+		<script src="Library/JavaScript/Water/WaterShader.js"></script>
+		<script src="Library/JavaScript/ThreeJS/Detector.js"></script>
+		<script src="Library/JavaScript/ThreeJS/stats.min.js"></script>
+    <script src="Library/JavaScript/Terrain/ShaderTerrain.js"></script>
+		<script src="Library/JavaScript/Controls/threex.keyboardstate.js"></script>
+
+
+		<script>
+
+		var keyboard	= new THREEx.KeyboardState();
+		var RocketObjects = [];
+		var Rocket;
+		var rocketsLaunched = 0;
+		var colorChoose;
+
+
+		Rocket = function(specifications){
+
+			this.object3D = new THREE.Object3D();
+			this.explosionRadius;
+			this.specifications;
+			if(specifications != undefined){
+				this.specifications = specifications;
+			}
+			if(this.specifications.position != undefined){
+				this.object3D.position.x = this.specifications.position.x
+				this.object3D.position.y = this.specifications.position.y
+				this.object3D.position.z = this.specifications.position.z
+			}
+
+
+			this.speedOfRocket = 120
+			if(this.specifications.speedOfRocket != undefined) this.speedOfRocket = this.specifications.speedOfRocket;
+
+			this.tagetScale = 30;
+			this.state1 = false;
+			this.state2 = false;
+			this.state3 = false
+			this.heightOfRocket = 0.09;
+			this.shapeLayers = [];
+			this.color1 = 0;
+
+			this.init();
+		};
+
+		Rocket.prototype.init = function(){
+
+			this.launchingRocket();
+			this.option = this.speedOfRocket;
+		};
+
+
+		// Color of rocket going up
+		Rocket.prototype.launchingRocket = function(){
+			var rocketGeometry = new THREE.SphereGeometry(5,30,30);
+			var rocketMaterial = new THREE.MeshBasicMaterial(
+				{color:0xffffff}
+			);
+
+			this.core = new THREE.Mesh(rocketGeometry,rocketMaterial);
+			this.object3D.add(this.core);
+
+			rocketGeometry.dispose();
+			rocketMaterial.dispose();
+
+
+		};
+
+
+		// Explosion Specifications
+		Rocket.prototype.explosionShape = function(explosionRadius,explosionElements,explosionSpheres,explosionSpheresDistance,colors){
+			for(var i = 0; i< explosionSpheres;i++){
+				var layerRadius = explosionRadius - explosionSpheresDistance*i;
+				var layerSegment = explosionElements - 2*i;
+				var color = colors[i];
+				this.explosionShapeSpecifications(layerSegment,layerRadius,color);
+			}
+		}
+
+
+		Rocket.prototype.explosionShapeSpecifications = function(segment,detonationPower,color){
+
+			explosionCentre =[
+
+				{x:0,y:detonationPower,z:0},
+				{x:0,y:-detonationPower,z:0}
+			]
+
+			for(var i = 1;i<segment;i++){
+
+				var rocketDirection = ( Math.PI/segment ) * i;
+				var explosionRadius = Math.abs( detonationPower * Math.sin(rocketDirection) );
+				var explosionNumber = Math.ceil( 2 * Math.sin(rocketDirection) * segment );
+
+				var y = detonationPower * Math.cos(rocketDirection) + Math.random()*2;
+
+				for(var k = 0;k<explosionNumber;k++){
+					var degreeY = Math.PI * 2 / explosionNumber * k + Math.random()*0.9;
+					var x = explosionRadius * Math.cos( degreeY ) + Math.random()*0.9;
+					var z = explosionRadius * Math.sin( degreeY ) + Math.random()*0.9;
+
+					var points = {x:x,y:y,z:z};
+
+					explosionCentre.push(points)
+				}
+			}
+
+
+			var explosionGeometry = new THREE.Geometry();
+
+			var explosions = explosionCentre.length
+			for(var i = 0;i < explosions;i++){
+				explosionGeometry.vertices.push(new THREE.Vector3(explosionCentre[i].x,explosionCentre[i].y,explosionCentre[i].z))
+			}
+
+			var explosionMaterial = new THREE.PointCloudMaterial({color:color,size:15,transparent: true ,opacity:1});
+			var explosionPoints = new THREE.PointCloud(explosionGeometry,explosionMaterial);
+			this.shapeLayers.push({object:explosionPoints,rocketGeometry:explosionGeometry,color:color,opacity:1});
+			this.object3D.add(explosionPoints);
+
+			explosionMaterial.dispose();
+
+		};
+
+
+		// State 1
+
+		// Initiate
+		Rocket.prototype.shootRocket = function(){
+			var temp_vy = this.option - this.heightOfRocket;
+
+			// Number of Rockets
+
+					if(temp_vy <= 4){
+					this.option = 2;
+					this.state1 = true;
+
+					if (this.color1 == 0){
+
+					//explosionRadius,explosionElements,explosionSpheres,explosionSpheresDistance,colors
+					this.explosionShape(35,25,9,4,[0x3CB371,0x87CEFA,0x7B68EE,0x556B2F,0xFFF0F5,0xFAF0E6]);
+					this.object3D.remove(this.core);
+
+				} else if (this.color1 == 1){
+
+					//explosionRadius,explosionElements,explosionSpheres,explosionSpheresDistance,colors
+					this.explosionShape(15,35,8,3,[0xFFFFE0,0xFFA07A ,0xFF8C00,0xFF6347,0xFF6347, 0xFFFFE0]);
+					this.object3D.remove(this.core);
+
+				} else if (this.color1 == 2){
+
+					//explosionRadius,explosionElements,explosionSpheres,explosionSpheresDistance,colors
+					this.explosionShape(9,50,6,1,[0xFF0000,0xFFA500 ,0xFF8C00,0xDC143C,0xFF6347, 0xA52A2A]);
+					this.object3D.remove(this.core);
+
+				} else if (this.color1 == 3){
+
+					//explosionRadius,explosionElements,explosionSpheres,explosionSpheresDistance,colors
+					this.explosionShape(60,20,6,5,[0xDCDCDC,0xF0E68C ,0x2F4F4F,0xF5FFFA,0xFDF5E6, 0x8FBC8F]);
+					this.object3D.remove(this.core);
+				}
+
+			}else{
+				this.option = temp_vy;
+
+			}
+			this.object3D.position.y += this.option;
+
+		}
+
+
+		// State 2
+
+
+		Rocket.prototype.animateExplosion = function(){
+			var diffScale = (this.tagetScale - this.object3D.scale.x)/15;
+			this.object3D.scale.x +=  diffScale;
+			this.object3D.scale.y = this.object3D.scale.z = this.object3D.scale.x;
+
+			// Difference in Height
+			if(diffScale <= 0.15) this.state2 = true;
+
+		}
+
+
+
+		// State 3
+
+
+		Rocket.prototype.fadeOut = function(){
+			var limit = this.shapeLayers.length;
+			for(var i = 0;i<limit;i++){
+				var explosionLayers = this.shapeLayers[i];
+				this.object3D.remove(explosionLayers.object);
+
+
+				var lengthOfExplosion =explosionLayers.opacity - 0.1;
+
+				var newMaterial = new THREE.PointCloudMaterial({color:explosionLayers.color,opacity:lengthOfExplosion,size:5})
+				var explosionPoints = new THREE.PointCloud(explosionLayers.rocketGeometry,newMaterial);
+				this.shapeLayers[i] = {object:explosionPoints,rocketGeometry:explosionLayers.rocketGeometry,color:explosionLayers.color,opacity:lengthOfExplosion};
+				this.object3D.add(explosionPoints)
+
+				newMaterial.dispose();
+
+				// Fading Out
+				if(lengthOfExplosion < 0.15){
+					this.object3D.remove(explosionPoints);
+					explosionLayers.rocketGeometry.dispose();
+					this.shapeLayers[i] = null;
+				}
+
+			}
+
+			// Disappear
+			if(lengthOfExplosion < 0.15){
+				this.state3 = true;
+			}
+		}
+
+		// Initiate Rockets
+			Rocket.prototype.animate = function(){
+			if(!this.state1) this.shootRocket();
+			else if( ! this.state2) this.animateExplosion();
+			else if(! this.state3 )this.fadeOut();
+		}
+
+
+			init();
+
+
+		function init(){
+			setScene();
+			render();
+
+
+			animate();
+
+		};
+
+
+
+
+
+		function setScene (){
+			scene = new THREE.Scene();
+			var normals = new THREE.TextureLoader().load( 'Library/JavaScript/ThreeJS/normals.jpg' );
+			renderer = new THREE.WebGLRenderer();
+			renderer.setSize(465, 465);
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild(renderer.domElement);
+
+
+			scene = new THREE.Scene();
+
+
+			// Add Directional Sun Light
+			var light = new THREE.DirectionalLight( 0xffffbb, 1 );
+			light.position.set( -20, 1, +10 );
+			light.intensity = 1;
+			scene.add( light );
+			var ambient = new THREE.AmbientLight( 0xffffff );
+			ambient.intensity = 0.3;
+			scene.add( ambient );
+
+
+			camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 0.5, 3000000 );
+			camera.position.set( -900, -900, 200 );
+			camera.position.y = 50;
+			camera.position.z = 700
+			camera.lookAt({x:0,y:400,z:0})
+
+			controls = new THREE.OrbitControls( camera, renderer.domElement );
+			controls.maxDistance = 100000.0;
+			controls.enablePan = false;
+			controls.minDistance = 10.0;
+			controls.maxPolarAngle = Math.PI * 0.500;
+			controls.target.set( 0, 300, 0 );
+
+
+
+			// Add Water Shader
+			water = new THREE.TextureLoader().load( 'Library/Water/Water.jpg' );
+			normals.wrapS = normals.wrapT = THREE.RepeatWrapping;
+
+			water = new THREE.Water( renderer, camera, scene, {
+				textureWidth: 512,
+				map: water,
+				textureHeight: 512,
+				waterNormals: normals,
+				sunDirection: light.position.clone().normalize(),
+				depthWrite: false,
+				alpha: 	0.92,
+				sunColor: 0xffffff,
+				waterColor: 0x001e0f,
+				distortionScale: 70.0,
+				fog: scene.fog,
+
+			} );
+
+			var parameters = {
+				width: 2000,
+				height: 2000,
+				widthSegments: 250,
+				heightSegments: 250,
+				depth: 1500,
+				param: 4,
+				filterparam: 1
+			};
+
+
+			// Add Mirroring
+			mirrorMesh = new THREE.Mesh(
+			new THREE.PlaneBufferGeometry( parameters.width * 500, parameters.height * 500 ),
+			water.material
+			);
+			mirrorMesh.add( water );
+			mirrorMesh.rotation.x = - Math.PI * 0.5;
+			scene.add( mirrorMesh );
+
+
+			// SkyBox
+			var urlPrefix = "Library/SkyBox/";
+			var ext = ".jpg";
+			var urls = [ "night4" + ext,
+			"night2" + ext,
+			"night5" + ext,
+			"night5" + ext,
+			"night3" + ext,
+			"night1" + ext ];
+
+			var reflectionCube = new THREE.CubeTextureLoader().setPath( 'Library/SkyBox/' ).load( urls, onError=function(e) {console.log(e)} );
+			reflectionCube.format = THREE.RGBFormat;
+			var refractionCube = new THREE.CubeTextureLoader().setPath( 'Library/SkyBox/' ).load( urls, onError=function(e) {console.log(e)} );
+			refractionCube.mapping = THREE.CubeRefractionMapping;
+			refractionCube.format = THREE.RGBFormat;
+
+			var shader = THREE.ShaderLib["cube"];
+			shader.uniforms[ "tCube" ].value = reflectionCube;
+			var material = new THREE.ShaderMaterial( {
+				fragmentShader: shader.fragmentShader,
+				vertexShader: shader.vertexShader,
+				uniforms: shader.uniforms,
+				depthWrite: false,
+				side: THREE.BackSide
+			} );
+
+			var boxGeo = new THREE.BoxGeometry( 1000000, 1000000, 1000000 ),
+			mesh = new THREE.Mesh( boxGeo, material );
+			mesh.position.set(0, 500000, 0);
+			scene.add( mesh );
+			mesh.needsUpdate = true;
+
+
+			// Terrain
+			// Sound Listener
+			//Create an AudioListener and add it to the camera
+			var listener = new THREE.AudioListener();
+			camera.add( listener );
+
+			//Create the PositionalAudio object (passing in the listener)
+			var soundNature = new THREE.PositionalAudio( listener );
+
+			//Load a sound and set it as the PositionalAudio object's buffer
+			var audioLoader = new THREE.AudioLoader();
+			audioLoader.load( 'Library/Music/naturesound.mp3', function( buffer ) {
+				soundNature.setBuffer( buffer );
+
+			//Set Sound Distance
+				soundNature.setRefDistance( 1000 );
+
+			//Looping Audio File
+				soundNature.loop = true;
+				soundNature.autoplay = true;
+				soundNature.play();
+			});
+
+
+      // heightmap
+      var texture = THREE.ImageUtils.loadTexture('Library/Terrain/heightmap.bmp');
+
+      // two texture
+      var normalTexture = THREE.ImageUtils.loadTexture('Library/Terrain/terrain.bmp');
+			var detailTexture = THREE.ImageUtils.loadTexture('Library/Terrain/detail.bmp')
+
+      // rendering
+      var terrainShader = THREE.ShaderTerrain[ "terrain" ];
+      var uniformsTerrain = THREE.UniformsUtils.clone(terrainShader.uniforms);
+
+      // scaling
+      uniformsTerrain[ "tNormal" ].value = normalTexture;
+      uniformsTerrain[ "uNormalScale" ].value = 1;
+
+			uniformsTerrain[ "tDetail" ].value = detailTexture;
+
+      // displacement
+      uniformsTerrain[ "tDisplacement" ].value = texture;
+      uniformsTerrain[ "uDisplacementScale" ].value = 400;
+
+      // diffusion
+      uniformsTerrain[ "tDiffuse1" ].value = normalTexture;
+			uniformsTerrain[ "tDiffuse2" ].value = detailTexture;
+      uniformsTerrain[ "enableDiffuse1" ].value = true;
+      uniformsTerrain[ "enableDiffuse2" ].value = false;
+      uniformsTerrain[ "enableSpecular" ].value = true;
+
+      // Shader
+      var material = new THREE.ShaderMaterial({
+          uniforms:uniformsTerrain,
+          vertexShader:terrainShader.vertexShader,
+          fragmentShader:terrainShader.fragmentShader,
+          lights:true,
+          fog:true
+      });
+
+      // scaling
+      uniformsTerrain[ "uRepeatOverlay" ].value.set(1, 1);
+
+      // plane rocketGeometry
+      var geometryTerrain = new THREE.PlaneGeometry(2000, 2000, 40, 40);
+      geometryTerrain.applyMatrix(new THREE.Matrix4());
+      geometryTerrain.computeFaceNormals();
+      geometryTerrain.computeVertexNormals();
+      geometryTerrain.computeTangents();
+
+      // mesh
+      terrain = new THREE.Mesh(geometryTerrain, material);
+      terrain.position.set(0, -115, 0);
+      terrain.rotation.x = -Math.PI / 2;
+
+			// sound
+			terrain.add(soundNature);
+
+      // add the terrain to scene
+      scene.add(terrain);
+
+
+
+
+		};
+
+
+
+
+
+
+
+		// Create Rockets
+		function shootFirework() {
+
+				// Rocket Object Specifications
+				var oneRocket = new Rocket({position:{x:200 - Math.random()*400,y:0,z:Math.random()*10},speedOfRocket:12 + Math.random()*5});
+
+				// Rocket Type 1
+				if(keyboard.pressed("S")){
+
+						oneRocket.color1 = 0;
+
+						// Sound Listener
+						//Create an AudioListener and add it to the camera
+						var listener = new THREE.AudioListener();
+						camera.add( listener );
+						//Create the PositionalAudio object (passing in the listener)
+						var soundRocket = new THREE.PositionalAudio( listener );
+						//Load a sound and set it as the PositionalAudio object's buffer
+						var audioLoader = new THREE.AudioLoader();
+						audioLoader.load( 'Library/Music/rocketsound1.mp3', function( buffer ) {
+						soundRocket.setBuffer( buffer );
+						//Set Sound Distance
+							soundRocket.setRefDistance( 1200 );
+						//Looping Audio File
+							soundRocket.loop = false;
+							soundRocket.autoplay = false;
+							soundRocket.play();
+						});
+
+					terrain.add(soundRocket);
+
+					scene.add(oneRocket.object3D);
+					RocketObjects.push(oneRocket);
+					oneRocket = null;
+					}
+
+
+				// Rocket Type 2
+				if(keyboard.pressed("A")){
+
+						oneRocket.color1 = 1;
+
+					// Sound Listener
+					//Create an AudioListener and add it to the camera
+					var listener = new THREE.AudioListener();
+					camera.add( listener );
+					//Create the PositionalAudio object (passing in the listener)
+					var soundRocket = new THREE.PositionalAudio( listener );
+					//Load a sound and set it as the PositionalAudio object's buffer
+					var audioLoader = new THREE.AudioLoader();
+					audioLoader.load( 'Library/Music/rocketsound2.mp3', function( buffer ) {
+					soundRocket.setBuffer( buffer );
+					//Set Sound Distance
+						soundRocket.setRefDistance( 1200 );
+					//Looping Audio File
+						soundRocket.loop = false;
+						soundRocket.autoplay = false;
+						soundRocket.play();
+					});
+
+				terrain.add(soundRocket);
+
+				scene.add(oneRocket.object3D);
+				RocketObjects.push(oneRocket);
+				oneRocket = null;
+				}
+
+
+				// Rocket Type 3
+				if(keyboard.pressed("D")){
+
+						oneRocket.color1 = 2;
+						oneRocket.heightOfRocket = 0.08;
+						oneRocket.tagetScale = 60;
+
+					// Sound Listener
+					//Create an AudioListener and add it to the camera
+					var listener = new THREE.AudioListener();
+					camera.add( listener );
+					//Create the PositionalAudio object (passing in the listener)
+					var soundRocket = new THREE.PositionalAudio( listener );
+					//Load a sound and set it as the PositionalAudio object's buffer
+					var audioLoader = new THREE.AudioLoader();
+					audioLoader.load( 'Library/Music/rocketsound3.mp3', function( buffer ) {
+					soundRocket.setBuffer( buffer );
+					//Set Sound Distance
+						soundRocket.setRefDistance( 1200 );
+					//Looping Audio File
+						soundRocket.loop = false;
+						soundRocket.autoplay = false;
+						soundRocket.play();
+					});
+
+				terrain.add(soundRocket);
+
+				scene.add(oneRocket.object3D);
+				RocketObjects.push(oneRocket);
+				oneRocket = null;
+				}
+
+
+				// Rocket Type 4
+				if(keyboard.pressed("F")){
+
+						oneRocket.color1 = 3;
+						oneRocket.heightOfRocket = 0.045;
+
+					// Sound Listener
+					//Create an AudioListener and add it to the camera
+					var listener = new THREE.AudioListener();
+					camera.add( listener );
+					//Create the PositionalAudio object (passing in the listener)
+					var soundRocket = new THREE.PositionalAudio( listener );
+					//Load a sound and set it as the PositionalAudio object's buffer
+					var audioLoader = new THREE.AudioLoader();
+					audioLoader.load( 'Library/Music/rocketsound4.mp3', function( buffer ) {
+					soundRocket.setBuffer( buffer );
+					//Set Sound Distance
+						soundRocket.setRefDistance( 1200 );
+					//Looping Audio File
+						soundRocket.loop = false;
+						soundRocket.autoplay = false;
+						soundRocket.play();
+					});
+
+				terrain.add(soundRocket);
+
+				scene.add(oneRocket.object3D);
+				RocketObjects.push(oneRocket);
+				oneRocket = null;
+				}
+
+
+		};
+
+		function render(){
+
+			requestAnimationFrame(render);
+
+			// Maximum Number of launchable rockets
+			if((rocketsLaunched % 4) == 0){
+
+				shootFirework();
+			}
+
+
+			renderer.render(scene,camera);
+			var time = performance.now() * 0.001;
+
+			water.material.uniforms.time.value += 1.0 / 60.0;
+			controls.update();
+			water.render();
+
+			var limit = RocketObjects.length
+			var tempArray = [];
+
+			for(var i = 0;i<limit;i++){
+
+				RocketObjects[i].animate();
+
+				if(!RocketObjects[i].state3){
+
+					tempArray.push(
+						RocketObjects[i])
+
+				}else{
+
+					scene.remove(RocketObjects[i].object3D);
+
+				}
+			}
+			RocketObjects = tempArray;
+
+			rocketsLaunched++;
+		}
+
+		</script>
+	</body>
+</html>
